@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title></title>
+  </head>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    #admin-panel {
+      border: 1px solid black;
+      border-radius: 20px;
+      background-color: steelblue;
+      padding: 40px;
+      position: fixed;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      left: 50%;
+      width: 600px;
+      z-index: 2;
+      display: none;
+    }
+
+    #iframe {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      border: none;
+      padding: 0;
+      margin: 0;
+      z-index: 1;
+    }
+
+    label,
+    input {
+      display: block;
+      width: 100%;
+    }
+    button {
+      margin-right: 10px;
+      padding: 4px 8px;
+      font-size: 16px;
+    }
+  </style>
+  <body>
+    <div id="admin-panel">
+      <h1>Admin-panel</h1>
+      <p id="online-status">Online-status</p>
+      <br />
+      <label for="url">Url</label>
+      <input id="url" type="text" />
+      <label for="username"> Username </label>
+      <input id="username" type="text" />
+      <label for="deviceId">DeviceId </label>
+      <input id="deviceId" type="text" />
+      <label for="ackString">Ack String </label>
+      <input id="ackString" type="text" />
+      <br />
+      <br />
+      <div>
+        <button id="update-btn">Update config</button>
+      </div>
+      <div>
+        <button id="delete-btn">Reset config (use default)</button>
+      </div>
+    </div>
+    <iframe id="iframe"></iframe>
+    <script>
+      /*** @type {HTMLDivElement}*/
+      const onlineEl = document.getElementById("online-status");
+      /*** @type {HTMLIFrameElement}*/
+      const iframeEl = document.getElementById("iframe");
+      /*** @type {HTMLInputElement}*/
+      const username = document.getElementById("username");
+      /*** @type {HTMLInputElement}*/
+      const url = document.getElementById("url");
+      /*** @type {HTMLInputElement}*/
+      const deviceId = document.getElementById("deviceId");
+      /*** @type {HTMLInputElement}*/
+      const ackString = document.getElementById("ackString");
+
+      const updateConfigBtn = document.getElementById("update-btn");
+      const deleteConfigBtn = document.getElementById("delete-btn");
+      const admin = document.getElementById("admin-panel");
+      const initialConfig = require("./config");
+
+      const TICK_RATE = 1000;
+      let tick_since_ack = 0;
+      let config = { ...initialConfig };
+      let ACK_EVERY_OR_RELOAD = config.reloadAfterSec;
+
+      const getConfig = () => {
+        const r = { ...initialConfig };
+        try {
+          const cache = localStorage.getItem("config");
+
+          if (!cache) {
+            // FIRST LOAD
+            const clone = { ...config };
+            url.value = clone.url;
+            ackString.value = clone.ackString;
+            username.value = clone.username;
+            deviceId.value = clone.deviceId;
+            localStorage.setItem("config", JSON.stringify(clone));
+            admin.style.display = "block";
+            return r;
+          }
+          const c = JSON.parse(cache);
+          if (c.url) r.url = c.url;
+          if (c.username) r.username = c.username;
+          if (c.deviceId) r.deviceId = c.deviceId;
+          if (c.ackString) r.ackString = c.ackString;
+          return r;
+        } catch (e) {
+          return r;
+        }
+      };
+
+      const TAG = "[MAIN]: ";
+      // Current Config
+      config = getConfig();
+      console.groupCollapsed(TAG + "Current Config");
+      console.log(config);
+      console.groupEnd();
+      iframeEl.src = config.url;
+
+      const updateForm = () => {
+        const c = getConfig();
+        username.value = c.username;
+        deviceId.value = c.deviceId;
+        url.value = c.url;
+        ackString.value = c.ackString;
+      };
+
+      const openForm = () => {
+        updateForm();
+        admin.style.display = "block";
+      };
+
+      const closeForm = () => {
+        username.value = "";
+        deviceId.value = "";
+        url.value = "";
+        ackString.value = "";
+        admin.style.display = "none";
+      };
+
+      updateConfigBtn.onclick = () => {
+        config.url = url.value;
+        config.username = username.value;
+        config.deviceId = deviceId.value;
+        config.ackString = ackString.value;
+        const clone = { ...config };
+        iframeEl.src = config.url;
+        localStorage.setItem("config", JSON.stringify(clone));
+      };
+
+      deleteConfigBtn.onclick = () => {
+        localStorage.removeItem("config");
+        config = { ...initialConfig };
+        iframeEl.src = config.url;
+        updateForm();
+      };
+
+      iframeEl.onerror = (e) => {
+        console.log(e);
+      };
+
+      window.onmessage = (m) => {
+        if (!config.ackString) return;
+        if (m.data === config.ackString) {
+          tick_since_ack = 0;
+        }
+      };
+
+      /*** @param {object} data*/
+      const sendMessageToIframe = (data) => {
+        iframeEl.contentWindow.postMessage(data, "*");
+      };
+
+      window.addEventListener("fromMain", (e) => {
+        if (e instanceof CustomEvent) {
+          const d = e.detail;
+          if (d.kind === "toggle-admin") {
+            if (admin.style.display === "none") {
+              openForm();
+            } else {
+              closeForm();
+            }
+          }
+
+          if (
+            d.kind === "keyboard-event" &&
+            d.key &&
+            typeof d.key === "string"
+          ) {
+            sendMessageToIframe({ kind: "keyboard-event", key: d.key });
+          }
+          if (d.kind === "tick") {
+            const username = config.username;
+            const deviceId = config.deviceId;
+            const ackString = config.ackString;
+            const message = {
+              kind: "tick",
+              username,
+              deviceId,
+              ackString,
+            };
+            sendMessageToIframe(message);
+          }
+        }
+      });
+
+      const ticker = () => {
+        onlineEl.innerText = window.navigator.onLine ? "online" : "offline";
+        tick_since_ack = tick_since_ack + 1;
+
+        if (config.ackString && tick_since_ack > ACK_EVERY_OR_RELOAD) {
+          console.log("RELOADING IFRAME!!");
+          console.groupCollapsed(TAG + "reloading iframe");
+          console.log("config.url", config.url);
+          console.log("tick_since_ack", tick_since_ack);
+          console.log("ACK_EVERY_OR_RELOAD", ACK_EVERY_OR_RELOAD);
+          console.groupEnd();
+          iframeEl.src = config.url;
+          tick_since_ack = 0;
+        }
+      };
+
+      setInterval(ticker, TICK_RATE);
+    </script>
+  </body>
+</html>

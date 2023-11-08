@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "declaration": true,
+    "declarationMap": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "strictPropertyInitialization": true,
+    "noUncheckedIndexedAccess": true,
+    "sourceMap": true
+  },
+  "exclude": ["node_modules"]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "iki",
+  "version": "1.0.0",
+  "description": "A simple Electron app to display a single web page in kiosk mode.",
+  "main": "src/main.js",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "dev": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^27.0.3",
+    "prettier": "^3.0.3",
+    "typescript": "^5.2.2"
+  }
+}
