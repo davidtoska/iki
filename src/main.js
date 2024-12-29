@@ -5,7 +5,7 @@ const Config = require("../config");
 
 const APP_PATH = app.getAppPath();
 const INDEX_PATH = path.join(APP_PATH, "index.html");
-const now = Date.now();
+const APP_STARTED_AT = Date.now();
 const TAG = "[MAIN]: ";
 const program = async () => {
   try {
@@ -22,11 +22,11 @@ const program = async () => {
   console.log(TAG + "width=", width);
 
   const webWindow = new BrowserWindow({
-    width: width,
-    height: height,
+    width: width / 4,
+    height: height/ 2,
     frame: false,
-    fullscreen: true,
-    kiosk: true,
+    fullscreen: false,
+    kiosk: false,
     backgroundColor: "#000000",
     webPreferences: {
       nodeIntegration: true,
@@ -63,7 +63,7 @@ const program = async () => {
       if (Config.devtools) {
         webWindow.webContents.openDevTools();
       }
-      const loadTime = Date.now() - now;
+      const loadTime = Date.now() - APP_STARTED_AT;
       console.log("[MAIN]: webWindow loaded in: " + loadTime + "ms");
       sendMessage({ kind: "tick" });
     })
